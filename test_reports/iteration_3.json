@@ -1,0 +1,24 @@
+{
+  "summary": "Verified the OpenAI Realtime beta->GA migration fix on the Twilio Media Streams bridge. Live wss://.../api/voice/media simulation: sent Twilio-style start + 20 mu-law silence frames, received 20 inbound 'media' frames with time-to-first-audio ~0.79s. No beta_api_shape_disabled error in the current backend process (the single occurrence in backend.err.log at line 1383 predates the last supervisor restart at line 1460). Readiness, mock-agent simulate regression (5 turns -> submit tool, budget per turn, transcript>=5, linked order_id), REST vertical slice with idempotent submit, and verify-caller guards (invalid_phone + confirmation_required) all pass. Full pytest suite 84/84 in 8.3s.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_media_ws.py",
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "openai_realtime.py GA shape looks correct: session.type='realtime', nested audio.input/output with audio/pcmu, output_modalities=['audio'], no OpenAI-Beta header, response.output_audio.delta event handled.",
+    "MediaOrchestrator successfully bridges mu-law 8k in both directions; TTFA ~0.79s for silence input is healthy.",
+    "verify-caller confirm=true still places a real billable call by design; document/guard in UI to avoid accidents."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (84/84)", "frontend": "N/A - skipped per request"},
+  "test_credentials": "N/A - no auth",
+  "seed_data_creation": "None - tests self-provision orders",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "test_media_ws.py hits real wss endpoint and opens a small-cost OpenAI Realtime session per run (intended for regression). Run standalone: `python /app/backend/tests/test_media_ws.py`. On PASS you should see '>=1 inbound media frames'. If it regresses to 0, first check /var/log/supervisor/backend.err.log for 'beta_api_shape_disabled' or 4xx close codes from OpenAI. Full pytest suite = 84 tests, ~8s. Do NOT POST confirm=true to /api/voice/verify-caller (real call).",
+  "rca of the issue": "N/A - previous bug (beta shape) is fixed; verified end-to-end via live media WS returning agent audio frames."
+}
