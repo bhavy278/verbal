@@ -15,7 +15,7 @@ import uuid
 from . import tools as voice_tools
 from . import transcript_store as ts
 from .call_state import CallState, CallStateMachine
-from .mock_model import MockTextAgent
+from .order_agent import get_order_agent
 from .voice_model import get_voice_model
 
 
@@ -25,7 +25,7 @@ class SimulateOrchestrator:
     def __init__(self, tenant_id: str, call_sid: str | None = None):
         self.call_sid = call_sid or "sim-" + uuid.uuid4().hex[:10]
         self.session = {"tenant_id": tenant_id, "call_sid": self.call_sid}
-        self.agent = MockTextAgent()
+        self.agent = get_order_agent(self.call_sid, tenant_id)
         self.fsm = CallStateMachine()
 
     async def start(self) -> dict:

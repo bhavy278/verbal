@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Phone, PhoneCall, Send, Wrench, CheckCircle2, Clock, Utensils, Receipt, Sparkles,
+  Phone, PhoneCall, Send, Wrench, CheckCircle2, Clock, Utensils, Receipt, Sparkles, Timer,
 } from "lucide-react";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -102,6 +102,7 @@ function OrderTicket({ order }) {
               <CheckCircle2 size={16} /> Accepted by POS · {order.pos_order_id}
             </div>
           )}
+          {q && <QuoteCountdown expiresAt={q.expires_at} status={order?.status} />}
         </div>
       )}
     </div>
@@ -113,6 +114,29 @@ const Row = ({ label, value }) => (
     <span>{label}</span><span>{value}</span>
   </div>
 );
+
+function QuoteCountdown({ expiresAt, status }) {
+  const [left, setLeft] = useState(0);
+  useEffect(() => {
+    const tick = () => setLeft(Math.max(0, Math.floor((new Date(expiresAt) - new Date()) / 1000)));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [expiresAt]);
+  if (!expiresAt || status === "accepted" || status === "submitted") return null;
+  const mm = String(Math.floor(left / 60)).padStart(2, "0");
+  const ss = String(left % 60).padStart(2, "0");
+  const expired = left <= 0;
+  return (
+    <div data-testid="quote-countdown"
+      className={`mt-3 flex items-center gap-2 text-xs rounded-lg px-3 py-2 border ${
+        expired ? "text-[var(--v-terra)] border-[var(--v-terra)]/40 bg-[var(--v-terra)]/10"
+                : "text-[var(--v-amber)] border-[var(--v-amber)]/30 bg-[var(--v-amber)]/5"}`}>
+      <Timer size={13} />
+      {expired ? "Price expired — say \"place the order\" to re-quote" : `This price holds for ${mm}:${ss}`}
+    </div>
+  );
+}
 
 function MenuCard({ menu }) {
   if (!menu) return null;
@@ -140,9 +164,11 @@ export default function App() {
   const [order, setOrder] = useState(null);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [ready, setReady] = useState(null);
   const scrollRef = useRef(null);
 
   useEffect(() => { axios.get(`${API}/menu`).then((r) => setMenu(r.data)).catch(() => {}); }, []);
+  useEffect(() => { axios.get(`${API}/voice/readiness`).then((r) => setReady(r.data)).catch(() => {}); }, []);
   useEffect(() => { scrollRef.current?.scrollTo({ top: 1e9, behavior: "smooth" }); }, [messages]);
 
   const startCall = async () => {
@@ -185,8 +211,9 @@ export default function App() {
               <div className="text-[10px] uppercase tracking-[0.25em] text-[var(--v-muted)]">Voice Ordering Console</div>
             </div>
           </div>
-          <div className="flex items-center gap-2 text-xs text-[var(--v-muted)]">
-            <span className="v-live-dot w-2 h-2 rounded-full bg-emerald-400" /> server-authoritative · mock voice model
+          <div className="flex items-center gap-2 text-xs text-[var(--v-muted)]" data-testid="readiness">
+            <span className="v-live-dot w-2 h-2 rounded-full bg-emerald-400" />
+            server-authoritative · brain: <span className="text-[var(--v-cream)]">{ready ? (ready.order_agent === "llm" ? ready.llm_model : "deterministic mock") : "…"}</span>
           </div>
         </div>
       </header>

@@ -9,6 +9,7 @@ predictable (no ML), tuned to the pilot pizza menu vocabulary.
 from __future__ import annotations
 
 import re
+from datetime import datetime, timezone
 from typing import Awaitable, Callable
 
 from .. import service
@@ -164,9 +165,24 @@ class MockTextAgent:
         return self._finish(session, steps, reply)
 
     async def _confirm_and_submit(self, session: dict, steps: list, run) -> dict:
-        q = await run("quote_order")
-        if not q["lines"]:
+        # Graceful re-quote: if the held price has lapsed (expired or stale),
+        # refresh it and read the new price back instead of silently submitting.
+        current = await service.get_order(session["order_id"])
+        if not current["lines"]:
             return self._finish(session, steps, "Your order is empty. What would you like?")
+        q = current.get("quote")
+        lapsed = True
+        if q and q.get("is_current"):
+            try:
+                lapsed = datetime.fromisoformat(q["expires_at"]) <= datetime.now(timezone.utc)
+            except ValueError:
+                lapsed = True
+        if lapsed:
+            await run("quote_order")
+            rb = await run("read_back")
+            prefix = "That quoted price had lapsed, so I've refreshed it. " if q else ""
+            return self._finish(session, steps, prefix + rb["readback"] + " Shall I place the order?")
+
         conf = await run("request_confirmation")
         await run("confirm_order", {"confirmation_id": conf["confirmation_id"]})
         sub = await run("submit_order")

@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from ..config import get_settings
 from .orchestrator import MediaOrchestrator, SimulateOrchestrator
+from .order_agent import resolve_agent_kind
 from .transcript_store import get_call
 
 router = APIRouter(prefix="/api/voice", tags=["voice"])
@@ -23,6 +24,24 @@ class SimStart(BaseModel):
 class SimTurn(BaseModel):
     call_sid: str
     text: str
+
+
+@router.get("/readiness")
+async def readiness() -> dict:
+    """Which voice/LLM/telephony pieces are configured (no secrets leaked)."""
+    s = get_settings()
+    return {
+        "order_agent": resolve_agent_kind(),
+        "order_agent_setting": s.order_agent,
+        "llm_model": s.llm_model,
+        "openai_key_present": bool(s.openai_api_key),
+        "voice_provider": s.voice_provider,
+        "twilio_configured": bool(s.twilio_account_sid and s.twilio_auth_token and s.twilio_from_number),
+        "twilio_from_number": s.twilio_from_number,
+        "twilio_budget_usd": s.twilio_budget_usd,
+        "store_call_audio": s.store_call_audio,
+        "store_call_transcript": s.store_call_transcript,
+    }
 
 
 @router.api_route("/twiml", methods=["GET", "POST"])

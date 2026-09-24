@@ -43,6 +43,17 @@ class Settings:
             "VERBAL_OPENAI_REALTIME_MODEL", "gpt-realtime"
         )
         self.openai_realtime_voice: str = os.environ.get("VERBAL_OPENAI_REALTIME_VOICE", "alloy")
+
+        # Natural-language order-taker (text simulate + console + orchestrator brain).
+        # "auto" -> LLM when OPENAI_API_KEY is present, else deterministic mock.
+        self.order_agent: str = os.environ.get("VERBAL_ORDER_AGENT", "auto")
+        self.llm_model: str = os.environ.get("VERBAL_LLM_MODEL", "gpt-5.4")
+
+        # Twilio telephony (Phase 2 live). Build-and-verify; secrets added later.
+        self.twilio_account_sid: str | None = os.environ.get("TWILIO_ACCOUNT_SID")
+        self.twilio_auth_token: str | None = os.environ.get("TWILIO_AUTH_TOKEN")
+        self.twilio_from_number: str | None = os.environ.get("TWILIO_FROM_NUMBER")
+        self.twilio_budget_usd: float = float(os.environ.get("VERBAL_TWILIO_BUDGET_USD", "10"))
         # Store both call audio + transcript (per product decision).
         self.store_call_audio: bool = os.environ.get("VERBAL_STORE_CALL_AUDIO", "true") == "true"
         self.store_call_transcript: bool = (

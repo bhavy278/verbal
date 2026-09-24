@@ -42,20 +42,21 @@ worker; pytest; Twilio + OpenAI Realtime behind an adapter interface.
 - Tenant isolation invariant; untrusted inputs treated as data.
 
 ## Implemented (2026-06)
-- ✅ Phase 0: docs skeleton, ADR-0001/0002/0003, pizza fixture + catalog schema,
-  threat model, backlog, discovery, contracts.
-- ✅ Phase 1: Mongo schema/indexes, Money, catalog loader/validator, order
-  aggregate + 5 commands, deterministic pricing, quote lifecycle + expiration,
-  revision-bound confirmation (property-tested), outbox + async worker, fake POS,
-  idempotent SubmitOrder, text simulator CLI (REPL + runner), 12 canonical
-  scenarios. Exit gate met: vertical slice E2E; duplicate submit ⇒ one accepted;
-  lost-response reconciles.
-- ✅ Phase 2 (mock path): TwiML + Twilio Media WS gateway, `VoiceModel` adapter
-  interface + Mock + dormant OpenAI Realtime (BYOK), orchestrator reusing domain
-  tools, barge-in (Twilio `clear` + transcript truncation), call state machine +
-  timers, call transcript + audio storage, text simulate WS/REST.
-- ✅ Frontend developer console (call simulator + live order + menu).
-- ✅ 65 pytest tests + 12/12 scenarios; testing agent: backend 100%, frontend 100%.
+- ✅ Phase 0/1/2 domain core + mock voice loop (see git history / docs).
+- ✅ **Smarter Phrasing**: LLM-driven natural-language order-taker
+  (`voice/llm_agent.py`, integration lib, model `gpt-5.4`, BYOK OpenAI key)
+  behind an agent factory (`voice/order_agent.py`); `auto` mode uses the LLM
+  when `OPENAI_API_KEY` is set, else the deterministic mock. The model only
+  selects fixed tools and reads back server numbers. Console header + rest
+  endpoint `/api/voice/readiness` report the active brain. **Now active (gpt-5.4).**
+- ✅ **Quote Timer**: spoken "This price holds for N minutes" in readback +
+  confirmation; live countdown in the console; graceful re-quote when the price
+  lapses (agent refreshes and re-reads before submitting).
+- ✅ **Live Staging Call — one-key-away**: OpenAI Realtime adapter (dormant),
+  TwiML `<Connect><Stream>` + Twilio Media WS, Twilio config
+  (`TWILIO_ACCOUNT_SID/AUTH_TOKEN/FROM_NUMBER`) + `$10` soft budget cap, all
+  surfaced via `/api/voice/readiness`.
+- ✅ 75 pytest tests + 12/12 scenarios pass; LLM full slice verified to accepted.
 
 ## Backlog (prioritized)
 - **P0 (Phase 2 live, needs human authorization + credentials):** wire real

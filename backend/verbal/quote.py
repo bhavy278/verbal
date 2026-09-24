@@ -20,6 +20,14 @@ from .pricing import price_order
 _WORDS = ["apple", "river", "maple", "cobalt", "harbor", "ember", "sparrow", "lunar"]
 
 
+def _hold_phrase(quote: Quote, now: datetime) -> str:
+    """Human phrase for how long the quoted price is valid."""
+    remaining = (quote.expires_at - now).total_seconds()
+    minutes = max(1, round(remaining / 60))
+    unit = "minute" if minutes == 1 else "minutes"
+    return f"This price holds for {minutes} {unit}."
+
+
 def build_quote(view: CatalogView, order: Order, ttl_seconds: int, now: datetime | None = None) -> Quote:
     """Price the current cart and attach a fresh, revision-bound quote."""
     if not order.lines:
@@ -66,6 +74,7 @@ def readback_text(order: Order, now: datetime | None = None) -> str:
         f"Subtotal {quote.subtotal.format()}, tax {quote.tax.format()}, "
         f"total {quote.total.format()}."
     )
+    parts.append(_hold_phrase(quote, now))
     return " ".join(parts)
 
 
@@ -79,7 +88,7 @@ def issue_confirmation(order: Order, now: datetime | None = None, rng: random.Ra
         revision=order.revision,
         quote_id=quote.quote_id,
         challenge=(
-            f"Your total is {quote.total.format()}. "
+            f"Your total is {quote.total.format()}. {_hold_phrase(quote, now)} "
             f"To place the order, please confirm with the word '{word}'."
         ),
     )
