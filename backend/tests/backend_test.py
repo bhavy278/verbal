@@ -351,7 +351,8 @@ class TestReadiness:
         body = r.json()
         assert body["voice_provider"] == "openai_realtime", body
         assert body["openai_key_present"] is True, body
-        assert body["twilio_configured"] is False, body
+        assert body["twilio_configured"] is True, body
+        assert body.get("twilio_from_number"), body
         assert body["twilio_budget_usd"] == 10.0, body
         assert "call_cost_per_min_usd" in body and body["call_cost_per_min_usd"] is not None
         assert body.get("public_base_url"), body

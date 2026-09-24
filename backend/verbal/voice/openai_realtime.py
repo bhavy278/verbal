@@ -54,27 +54,32 @@ class OpenAIRealtimeVoiceModel(VoiceModel):
 
         self._ws = await websockets.connect(
             OPENAI_REALTIME_URL.format(model=settings.openai_realtime_model),
-            additional_headers={
-                "Authorization": f"Bearer {settings.openai_api_key}",
-                "OpenAI-Beta": "realtime=v1",
-            },
+            additional_headers={"Authorization": f"Bearer {settings.openai_api_key}"},
             max_size=None,
         )
         await self._configure_session()
         self._pump_task = asyncio.create_task(self._pump_upstream())
 
     async def _configure_session(self) -> None:
+        # GA Realtime shape (session.type=realtime, nested audio, audio/pcmu).
         await self._ws.send(
             json.dumps(
                 {
                     "type": "session.update",
                     "session": {
-                        "modalities": ["audio", "text"],
+                        "type": "realtime",
                         "instructions": SYSTEM_PROMPT,
-                        "voice": get_settings().openai_realtime_voice,
-                        "input_audio_format": "g711_ulaw",
-                        "output_audio_format": "g711_ulaw",
-                        "turn_detection": {"type": "server_vad", "create_response": True},
+                        "output_modalities": ["audio"],
+                        "audio": {
+                            "input": {
+                                "format": {"type": "audio/pcmu"},
+                                "turn_detection": {"type": "server_vad"},
+                            },
+                            "output": {
+                                "format": {"type": "audio/pcmu"},
+                                "voice": get_settings().openai_realtime_voice,
+                            },
+                        },
                         "tools": TOOL_SPECS,
                         "tool_choice": "auto",
                     },
@@ -102,8 +107,8 @@ class OpenAIRealtimeVoiceModel(VoiceModel):
 
     async def _handle_event(self, event: dict) -> None:
         etype = event.get("type")
-        if etype == "response.audio.delta":
-            # mu-law bytes already base64; relay straight to Twilio.
+        if etype in ("response.output_audio.delta", "response.audio.delta"):
+            # GA sends mu-law bytes base64; relay straight to Twilio.
             await self._send_audio(event["delta"])
         elif etype == "input_audio_buffer.speech_started":
             # Barge-in: caller started talking over the agent.
