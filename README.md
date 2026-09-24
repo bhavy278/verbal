@@ -165,7 +165,9 @@ PRD/backlog: `/app/memory/PRD.md`.
 
 - ✅ Phase 0/1 done; duplicate submit ⇒ one accepted; lost-ack reconciles.
 - ✅ LLM order-taker (gpt-5.4) live in console; quote timer + graceful re-quote; budget guard.
-- ✅ Twilio number wired; **OpenAI Realtime GA bridge verified** (simulated Twilio media stream returned agent audio, first audio ~1.6s).
-- ⏳ A real end-to-end PSTN call was not yet observed in Twilio call logs — dial the number to confirm live, then check `/var/log/supervisor/backend.*.log`.
-- 🔒 To lock the webhook to Twilio later: set `VERBAL_ENFORCE_TWILIO_SIGNATURE=true`.
+- ✅ Twilio number wired; OpenAI Realtime **GA** bridge verified (simulated Twilio media stream returned agent audio, first audio ~0.8-1.0s).
+- ✅ Real phone calls working (orders reached POS). **Voice quality pass:** fixed barge-in cancel-spam (only interrupt when agent is speaking; server-VAD handles cancel), 20ms/160-byte audio framing for smooth playback, tuned server-VAD (threshold 0.6, silence 600ms, far_field noise reduction), natural GA voice `marin`, and a warm human persona prompt.
+- 🎚️ Voice is configurable via `VERBAL_OPENAI_REALTIME_VOICE` (e.g. `marin`, `cedar`, `alloy`).
+- 🔒 To lock the webhook to Twilio: set `VERBAL_ENFORCE_TWILIO_SIGNATURE=true`.
 - 💰 Console/simulate turns and live calls consume the OpenAI key (cost per turn/min).
+- Tests: 84 passing (`python -m pytest -q`); scenarios 12/12.
