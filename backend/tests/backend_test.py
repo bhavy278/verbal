@@ -327,6 +327,72 @@ class TestVoiceSimulator:
         assert call.get("order_id"), f"missing linked order_id: {call}"
 
 
+# ---------- caller-ID verification (Twilio trial) ----------
+class TestCallerVerification:
+    def test_verified_callers_readonly(self, s):
+        r = s.get(f"{BASE}/api/voice/verified-callers")
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body.get("twilio_credentials") is True, body
+        assert isinstance(body.get("verified"), list), body
+
+    @pytest.mark.parametrize("phone", ["12345", "555-1234", "notaphone", "", "+0"])
+    def test_verify_caller_invalid_phone(self, s, phone):
+        r = s.post(f"{BASE}/api/voice/verify-caller", json={"phone_number": phone})
+        assert r.status_code == 400, r.text
+        assert r.json().get("error") == "invalid_phone"
+
+
+# ---------- readiness ----------
+class TestReadiness:
+    def test_readiness_shape(self, s):
+        r = s.get(f"{BASE}/api/voice/readiness")
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["voice_provider"] == "openai_realtime", body
+        assert body["openai_key_present"] is True, body
+        assert body["twilio_configured"] is False, body
+        assert body["twilio_budget_usd"] == 10.0, body
+        assert "call_cost_per_min_usd" in body and body["call_cost_per_min_usd"] is not None
+        assert body.get("public_base_url"), body
+
+
+# ---------- voice simulator: budget object presence ----------
+class TestVoiceSimulatorBudget:
+    def test_mock_agent_budget_present(self, s):
+        r = s.post(f"{BASE}/api/voice/simulate/start", json={"agent": "mock"})
+        assert r.status_code == 200, r.text
+        start = r.json()
+        assert start.get("agent") == "mock-text", start
+        sid = start["call_sid"]
+
+        turns = [
+            "I would like a large pepperoni pizza with extra cheese",
+            "make that two",
+            "and a can of soda",
+            "what's my total",
+            "yes place the order",
+        ]
+        last = None
+        for t in turns:
+            r = s.post(
+                f"{BASE}/api/voice/simulate/turn",
+                json={"call_sid": sid, "text": t},
+            )
+            assert r.status_code == 200, r.text
+            body = r.json()
+            assert "budget" in body, body
+            budget = body["budget"]
+            assert "estimated_cost_usd" in budget, budget
+            assert "cap_usd" in budget, budget
+            assert "exceeded" in budget, budget
+            last = body
+            time.sleep(0.1)
+
+        tool_names = [tc.get("name") or tc.get("tool") for tc in (last.get("tool_calls") or [])]
+        assert any("submit" in (n or "").lower() for n in tool_names), tool_names
+
+
 # ---------- helpers ----------
 def _make_confirmed_order(s: requests.Session) -> str:
     oid = s.post(f"{BASE}/api/orders", json={}).json()["order_id"]

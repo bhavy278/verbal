@@ -32,6 +32,7 @@ class SimTurn(BaseModel):
 
 class VerifyCallerBody(BaseModel):
     phone_number: str
+    confirm: bool = False  # must be true to place the real (billable) Twilio call
 
 
 _E164 = re.compile(r"^\+[1-9]\d{6,14}$")
@@ -59,6 +60,14 @@ async def verify_caller(body: VerifyCallerBody) -> dict:
         return JSONResponse(
             status_code=400,
             content={"error": "twilio_not_configured", "message": "Twilio credentials are not set"},
+        )
+    if not body.confirm:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "error": "confirmation_required",
+                "message": f"This places a real (billable) call to {number}. Resend with confirm=true to proceed.",
+            },
         )
     try:
         result = await twilio_control.start_caller_verification(number)
