@@ -42,6 +42,9 @@ class VoiceModel(ABC):
     async def on_mark(self, name: str) -> None:  # optional
         """Twilio 'mark' ack that a chunk finished playing."""
 
+    async def say(self, text: str) -> None:  # optional
+        """Speak a server-authored line (used for budget/duration closings)."""
+
     @abstractmethod
     async def close(self) -> None:
         ...

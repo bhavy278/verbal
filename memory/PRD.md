@@ -56,7 +56,24 @@ worker; pytest; Twilio + OpenAI Realtime behind an adapter interface.
   TwiML `<Connect><Stream>` + Twilio Media WS, Twilio config
   (`TWILIO_ACCOUNT_SID/AUTH_TOKEN/FROM_NUMBER`) + `$10` soft budget cap, all
   surfaced via `/api/voice/readiness`.
-- ✅ 75 pytest tests + 12/12 scenarios pass; LLM full slice verified to accepted.
+- ✅ **Budget Guard**: live per-call cost estimate vs the $10 soft cap
+  (`call_state.py`); on breach the agent speaks a polite closing and the call
+  ends (simulate path returns `ended`; media path calls `model.say()` then
+  Twilio `calls().update(status="completed")` to hang up the PSTN leg). Verified.
+- ✅ **Live Phone Call — wired, blocked on Twilio number**: Twilio signature
+  validation on `/api/voice/twiml`, `PUBLIC_BASE_URL`-based TwiML `<Connect>
+  <Stream>`, server-side hang-up (`voice/twilio_control.py`), OpenAI Realtime
+  provider active. Credentials validated live via Twilio API. BLOCKED: the
+  Twilio account is Trial/$0 with no purchased Voice number.
+
+## Next tasks
+1. On Twilio: upgrade/add funds and buy a Voice-capable number (or authorize
+   API purchase once funded).
+2. Set `TWILIO_PHONE_NUMBER` in backend/.env; point its Voice webhook to
+   `https://voice-order-engine.preview.emergentagent.com/api/voice/twiml`
+   (can be done via Twilio API with the stored creds).
+3. Place the authorized staging call; capture p50/p95 first-audio latency +
+   barge-in timing (ADR-0002).
 
 ## Backlog (prioritized)
 - **P0 (Phase 2 live, needs human authorization + credentials):** wire real

@@ -80,6 +80,12 @@ async def close_call(call_sid: str) -> None:
     )
 
 
+async def mark_end_reason(call_sid: str, reason: str) -> None:
+    await dbmod.calls().update_one(
+        {"call_sid": call_sid}, {"$set": {"end_reason": reason}}
+    )
+
+
 async def get_call(call_sid: str) -> dict | None:
     doc = await dbmod.calls().find_one({"call_sid": call_sid})
     if not doc:

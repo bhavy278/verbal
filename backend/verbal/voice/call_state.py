@@ -27,6 +27,8 @@ class CallStateMachine:
         self.last_caller_input_at = self.started_at
         self.max_call_seconds = s.max_call_seconds
         self.silence_timeout_seconds = s.silence_timeout_seconds
+        self.cost_per_min = s.call_cost_per_min_usd
+        self.budget_usd = s.twilio_budget_usd
         self.history: list[str] = []
 
     def transition(self, to: CallState) -> None:
@@ -42,6 +44,12 @@ class CallStateMachine:
     def silence_duration(self) -> float:
         return time.monotonic() - self.last_caller_input_at
 
+    def estimated_cost_usd(self) -> float:
+        return (self.call_duration() / 60.0) * self.cost_per_min
+
+    def budget_exceeded(self) -> bool:
+        return self.budget_usd > 0 and self.estimated_cost_usd() >= self.budget_usd
+
     def should_end_for_duration(self) -> bool:
         return self.call_duration() >= self.max_call_seconds
 
@@ -50,3 +58,13 @@ class CallStateMachine:
 
     def end(self) -> None:
         self.transition(CallState.ENDED)
+
+
+BUDGET_CLOSING = (
+    "I'm sorry, we've reached the time limit for this call, so I have to wrap up "
+    "now. Please call back to finish your order. Thanks for calling, goodbye!"
+)
+DURATION_CLOSING = (
+    "We've reached the maximum call length, so I'll have to let you go. Please "
+    "call back to complete your order. Goodbye!"
+)

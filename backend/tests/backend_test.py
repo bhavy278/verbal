@@ -286,7 +286,9 @@ class TestDomainErrors:
 # ---------- voice text simulator ----------
 class TestVoiceSimulator:
     def test_voice_flow(self, s):
-        r = s.post(f"{BASE}/api/voice/simulate/start", json={})
+        # Pin to the deterministic mock agent so the test is free + reliable
+        # regardless of whether an LLM key is configured.
+        r = s.post(f"{BASE}/api/voice/simulate/start", json={"agent": "mock"})
         assert r.status_code == 200, r.text
         start = r.json()
         assert "call_sid" in start and "reply" in start

@@ -21,8 +21,8 @@ def resolve_agent_kind() -> str:
     return "llm" if settings.openai_api_key else "mock"
 
 
-def get_order_agent(call_sid: str, tenant_id: str):
-    kind = resolve_agent_kind()
+def get_order_agent(call_sid: str, tenant_id: str, kind: str | None = None):
+    kind = kind or resolve_agent_kind()
     if kind == "llm":
         from .llm_agent import LLMOrderAgent
 

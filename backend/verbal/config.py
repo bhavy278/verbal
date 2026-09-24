@@ -52,8 +52,16 @@ class Settings:
         # Twilio telephony (Phase 2 live). Build-and-verify; secrets added later.
         self.twilio_account_sid: str | None = os.environ.get("TWILIO_ACCOUNT_SID")
         self.twilio_auth_token: str | None = os.environ.get("TWILIO_AUTH_TOKEN")
-        self.twilio_from_number: str | None = os.environ.get("TWILIO_FROM_NUMBER")
+        self.twilio_from_number: str | None = (
+            os.environ.get("TWILIO_PHONE_NUMBER") or os.environ.get("TWILIO_FROM_NUMBER")
+        )
         self.twilio_budget_usd: float = float(os.environ.get("VERBAL_TWILIO_BUDGET_USD", "10"))
+        # Estimated blended cost/min (Twilio + S2S) used by the live budget guard.
+        self.call_cost_per_min_usd: float = float(
+            os.environ.get("VERBAL_CALL_COST_PER_MIN_USD", "0.30")
+        )
+        # Exact public base URL Twilio calls (for signatures + wss stream URL).
+        self.public_base_url: str | None = os.environ.get("PUBLIC_BASE_URL")
         # Store both call audio + transcript (per product decision).
         self.store_call_audio: bool = os.environ.get("VERBAL_STORE_CALL_AUDIO", "true") == "true"
         self.store_call_transcript: bool = (

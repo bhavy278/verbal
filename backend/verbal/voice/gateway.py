@@ -10,6 +10,7 @@ from ..config import get_settings
 from .orchestrator import MediaOrchestrator, SimulateOrchestrator
 from .order_agent import resolve_agent_kind
 from .transcript_store import get_call
+from . import twilio_control
 
 router = APIRouter(prefix="/api/voice", tags=["voice"])
 
@@ -19,6 +20,7 @@ _SIM_SESSIONS: dict[str, SimulateOrchestrator] = {}
 
 class SimStart(BaseModel):
     tenant_id: str | None = None
+    agent: str | None = None  # "mock" | "llm"; default follows config
 
 
 class SimTurn(BaseModel):
@@ -36,18 +38,41 @@ async def readiness() -> dict:
         "llm_model": s.llm_model,
         "openai_key_present": bool(s.openai_api_key),
         "voice_provider": s.voice_provider,
-        "twilio_configured": bool(s.twilio_account_sid and s.twilio_auth_token and s.twilio_from_number),
+        "twilio_configured": twilio_control.is_configured(),
         "twilio_from_number": s.twilio_from_number,
         "twilio_budget_usd": s.twilio_budget_usd,
+        "call_cost_per_min_usd": s.call_cost_per_min_usd,
+        "public_base_url": s.public_base_url,
         "store_call_audio": s.store_call_audio,
         "store_call_transcript": s.store_call_transcript,
     }
 
 
+def _public_host(request: Request) -> str:
+    """Prefer the exact configured public base URL (needed for signatures)."""
+    s = get_settings()
+    if s.public_base_url:
+        return s.public_base_url.rstrip("/").split("://", 1)[-1]
+    return request.url.hostname
+
+
 @router.api_route("/twiml", methods=["GET", "POST"])
 async def twiml(request: Request) -> Response:
     """TwiML that opens a bidirectional Media Stream to our WS."""
-    host = request.url.hostname
+    s = get_settings()
+    host = _public_host(request)
+    # Validate the Twilio signature when credentials are configured.
+    if s.twilio_auth_token:
+        url = f"https://{host}{request.url.path}"
+        if request.method == "POST":
+            form = await request.form()
+            params = {k: v for k, v in form.multi_items()}
+        else:
+            params = dict(request.query_params)
+        sig = request.headers.get("X-Twilio-Signature", "")
+        if not twilio_control.validate_signature(url, params, sig):
+            return Response(content="Invalid Twilio signature", status_code=403)
+
     ws_url = f"wss://{host}/api/voice/media"
     xml = (
         '<?xml version="1.0" encoding="UTF-8"?>'
@@ -93,10 +118,12 @@ async def simulate_ws(ws: WebSocket) -> None:
 
 @router.post("/simulate/start")
 async def simulate_start(body: SimStart) -> dict:
-    orch = SimulateOrchestrator(body.tenant_id or get_settings().default_tenant_id)
+    orch = SimulateOrchestrator(
+        body.tenant_id or get_settings().default_tenant_id, agent_kind=body.agent
+    )
     greeting = await orch.start()
     _SIM_SESSIONS[orch.call_sid] = orch
-    return greeting
+    return {**greeting, "agent": orch.agent.name}
 
 
 @router.post("/simulate/turn")

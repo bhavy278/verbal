@@ -9,12 +9,14 @@ Two entry points, one tool contract:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import uuid
 
 from . import tools as voice_tools
 from . import transcript_store as ts
-from .call_state import CallState, CallStateMachine
+from . import twilio_control
+from .call_state import BUDGET_CLOSING, DURATION_CLOSING, CallState, CallStateMachine
 from .order_agent import get_order_agent
 from .voice_model import get_voice_model
 
@@ -22,10 +24,10 @@ from .voice_model import get_voice_model
 class SimulateOrchestrator:
     """Text simulate loop for the fake WebSocket (no telephony/keys required)."""
 
-    def __init__(self, tenant_id: str, call_sid: str | None = None):
+    def __init__(self, tenant_id: str, call_sid: str | None = None, agent_kind: str | None = None):
         self.call_sid = call_sid or "sim-" + uuid.uuid4().hex[:10]
         self.session = {"tenant_id": tenant_id, "call_sid": self.call_sid}
-        self.agent = get_order_agent(self.call_sid, tenant_id)
+        self.agent = get_order_agent(self.call_sid, tenant_id, agent_kind)
         self.fsm = CallStateMachine()
 
     async def start(self) -> dict:
@@ -38,6 +40,18 @@ class SimulateOrchestrator:
 
     async def handle_user(self, text: str) -> dict:
         self.fsm.mark_caller_input()
+        # Budget guard: cut the call short politely if the ceiling is reached.
+        if self.fsm.state != CallState.ENDED and self.fsm.budget_exceeded():
+            await ts.add_transcript(self.call_sid, "user", text)
+            await ts.add_transcript(self.call_sid, "assistant", BUDGET_CLOSING)
+            self.fsm.end()
+            await ts.close_call(self.call_sid)
+            return {
+                "call_sid": self.call_sid, "reply": BUDGET_CLOSING, "ended": True,
+                "order": None, "status": None, "tool_calls": [],
+                "budget": self._budget(),
+            }
+
         self.fsm.transition(CallState.THINKING)
         await ts.add_transcript(self.call_sid, "user", text)
 
@@ -56,6 +70,14 @@ class SimulateOrchestrator:
             "order": result.get("order"),
             "status": result.get("status"),
             "tool_calls": [{"tool": s["tool"], "args": s["args"]} for s in result["steps"]],
+            "budget": self._budget(),
+        }
+
+    def _budget(self) -> dict:
+        return {
+            "estimated_cost_usd": round(self.fsm.estimated_cost_usd(), 4),
+            "cap_usd": self.fsm.budget_usd,
+            "exceeded": self.fsm.budget_exceeded(),
         }
 
     async def end(self) -> None:
@@ -74,6 +96,8 @@ class MediaOrchestrator:
         self.model = get_voice_model()
         self.session = {"tenant_id": tenant_id}
         self.fsm = CallStateMachine()
+        self._monitor: asyncio.Task | None = None
+        self._ending = False
 
     async def _send_audio(self, payload_b64: str) -> None:
         if self.stream_sid:
@@ -98,6 +122,35 @@ class MediaOrchestrator:
             await ts.link_order(self.call_sid, self.session["order_id"])
         return result
 
+    async def _monitor_limits(self) -> None:
+        """Watchdog: end the call politely on budget or max-duration limits."""
+        while not self._ending:
+            await asyncio.sleep(1.0)
+            if self.fsm.budget_exceeded():
+                await self._end_call(BUDGET_CLOSING, "budget")
+                return
+            if self.fsm.should_end_for_duration():
+                await self._end_call(DURATION_CLOSING, "max_duration")
+                return
+
+    async def _end_call(self, closing: str, reason: str) -> None:
+        if self._ending:
+            return
+        self._ending = True
+        try:
+            if self.call_sid:
+                await ts.add_transcript(self.call_sid, "assistant", closing)
+                await ts.mark_end_reason(self.call_sid, reason)
+            await self.model.say(closing)     # speak the closing line to the caller
+            await asyncio.sleep(2.0)           # let the audio flush
+            await twilio_control.hang_up_call(self.call_sid)  # end the PSTN leg
+        finally:
+            self.fsm.end()
+            try:
+                await self.ws.close()
+            except Exception:  # noqa: BLE001
+                pass
+
     async def run(self) -> None:
         """Consume Twilio Media Stream frames until the call ends."""
         await self.ws.accept()
@@ -117,6 +170,7 @@ class MediaOrchestrator:
                         dispatch_tool=self._dispatch,
                         session=self.session,
                     )
+                    self._monitor = asyncio.create_task(self._monitor_limits())
                 elif event == "media":
                     self.fsm.mark_caller_input()
                     payload = msg["media"]["payload"]
@@ -128,6 +182,9 @@ class MediaOrchestrator:
                 elif event == "stop":
                     break
         finally:
+            self._ending = True
+            if self._monitor:
+                self._monitor.cancel()
             await self.model.close()
             if self.call_sid:
                 await ts.close_call(self.call_sid)

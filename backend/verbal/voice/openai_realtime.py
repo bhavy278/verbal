@@ -145,3 +145,16 @@ class OpenAIRealtimeVoiceModel(VoiceModel):
         if self._ws is not None:
             await self._ws.close()
             self._ws = None
+
+    async def say(self, text: str) -> None:
+        """Make the model speak an exact server-authored closing line."""
+        if self._ws is None:
+            return
+        await self._ws.send(
+            json.dumps(
+                {
+                    "type": "response.create",
+                    "response": {"modalities": ["audio", "text"], "instructions": f"Say exactly: {text}"},
+                }
+            )
+        )
