@@ -1,0 +1,130 @@
+{
+  "id": "cat_pizzahub_v1",
+  "tenant_id": "pizzahub",
+  "name": "PizzaHub Pilot Menu",
+  "currency": "USD",
+  "tax_rate_bps": 825,
+  "version": 1,
+  "modifier_groups": [
+    {
+      "id": "grp_crust",
+      "name": "Crust",
+      "min_select": 1,
+      "max_select": 1,
+      "required": true,
+      "modifiers": [
+        {"id": "crust_thin", "name": "Thin Crust", "price": 0},
+        {"id": "crust_classic", "name": "Classic Crust", "price": 0},
+        {"id": "crust_stuffed", "name": "Stuffed Crust", "price": 200},
+        {"id": "crust_glutenfree", "name": "Gluten-Free Crust", "price": 300}
+      ]
+    },
+    {
+      "id": "grp_sauce",
+      "name": "Sauce",
+      "min_select": 1,
+      "max_select": 1,
+      "required": true,
+      "modifiers": [
+        {"id": "sauce_tomato", "name": "Tomato Sauce", "price": 0},
+        {"id": "sauce_bbq", "name": "BBQ Sauce", "price": 0},
+        {"id": "sauce_white", "name": "White Garlic Sauce", "price": 0}
+      ]
+    },
+    {
+      "id": "grp_toppings",
+      "name": "Toppings",
+      "min_select": 0,
+      "max_select": 8,
+      "required": false,
+      "modifiers": [
+        {"id": "top_extra_cheese", "name": "Extra Cheese", "price": 150},
+        {"id": "top_pepperoni", "name": "Pepperoni", "price": 200},
+        {"id": "top_mushrooms", "name": "Mushrooms", "price": 150},
+        {"id": "top_olives", "name": "Olives", "price": 100},
+        {"id": "top_onions", "name": "Onions", "price": 100},
+        {"id": "top_peppers", "name": "Green Peppers", "price": 100},
+        {"id": "top_sausage", "name": "Italian Sausage", "price": 200},
+        {"id": "top_bacon", "name": "Bacon", "price": 220},
+        {"id": "top_pineapple", "name": "Pineapple", "price": 150},
+        {"id": "top_jalapenos", "name": "Jalapenos", "price": 100}
+      ]
+    },
+    {
+      "id": "grp_wing_sauce",
+      "name": "Wing Sauce",
+      "min_select": 1,
+      "max_select": 1,
+      "required": true,
+      "modifiers": [
+        {"id": "wing_buffalo", "name": "Buffalo", "price": 0},
+        {"id": "wing_bbq", "name": "BBQ", "price": 0},
+        {"id": "wing_plain", "name": "Plain", "price": 0}
+      ]
+    }
+  ],
+  "items": [
+    {
+      "id": "pizza_margherita",
+      "name": "Margherita Pizza",
+      "category": "Pizza",
+      "modifier_group_ids": ["grp_crust", "grp_sauce", "grp_toppings"],
+      "variants": [
+        {"id": "sz_small", "name": "Small 10\"", "price": 999},
+        {"id": "sz_medium", "name": "Medium 12\"", "price": 1299},
+        {"id": "sz_large", "name": "Large 14\"", "price": 1599}
+      ]
+    },
+    {
+      "id": "pizza_pepperoni",
+      "name": "Pepperoni Pizza",
+      "category": "Pizza",
+      "modifier_group_ids": ["grp_crust", "grp_sauce", "grp_toppings"],
+      "variants": [
+        {"id": "sz_small", "name": "Small 10\"", "price": 1199},
+        {"id": "sz_medium", "name": "Medium 12\"", "price": 1499},
+        {"id": "sz_large", "name": "Large 14\"", "price": 1799}
+      ]
+    },
+    {
+      "id": "pizza_veggie",
+      "name": "Garden Veggie Pizza",
+      "category": "Pizza",
+      "modifier_group_ids": ["grp_crust", "grp_sauce", "grp_toppings"],
+      "variants": [
+        {"id": "sz_small", "name": "Small 10\"", "price": 1149},
+        {"id": "sz_medium", "name": "Medium 12\"", "price": 1449},
+        {"id": "sz_large", "name": "Large 14\"", "price": 1749}
+      ]
+    },
+    {
+      "id": "side_garlic_bread",
+      "name": "Garlic Bread",
+      "category": "Sides",
+      "modifier_group_ids": [],
+      "variants": [
+        {"id": "sz_one", "name": "Regular", "price": 499}
+      ]
+    },
+    {
+      "id": "side_wings",
+      "name": "Chicken Wings",
+      "category": "Sides",
+      "modifier_group_ids": ["grp_wing_sauce"],
+      "variants": [
+        {"id": "sz_6pc", "name": "6 pieces", "price": 799},
+        {"id": "sz_12pc", "name": "12 pieces", "price": 1399}
+      ]
+    },
+    {
+      "id": "drink_soda",
+      "name": "Soda",
+      "category": "Drinks",
+      "modifier_group_ids": [],
+      "variants": [
+        {"id": "sz_can", "name": "Can", "price": 199},
+        {"id": "sz_bottle", "name": "Bottle", "price": 299}
+      ]
+    }
+  ]
+}

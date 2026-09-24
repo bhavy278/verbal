@@ -1,0 +1,1 @@
+"""Verbal text simulator package."""
