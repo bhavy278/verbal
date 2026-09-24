@@ -35,6 +35,7 @@ class OpenAIRealtimeVoiceModel(VoiceModel):
         self._clear_audio = None
         self._dispatch_tool = None
         self._session = None
+        self._assistant_speaking = False
 
     async def open(self, *, send_audio, clear_audio, dispatch_tool, session) -> None:
         settings = get_settings()
@@ -73,7 +74,15 @@ class OpenAIRealtimeVoiceModel(VoiceModel):
                         "audio": {
                             "input": {
                                 "format": {"type": "audio/pcmu"},
-                                "turn_detection": {"type": "server_vad"},
+                                "noise_reduction": {"type": "far_field"},
+                                "turn_detection": {
+                                    "type": "server_vad",
+                                    "threshold": 0.6,
+                                    "prefix_padding_ms": 300,
+                                    "silence_duration_ms": 600,
+                                    "interrupt_response": True,
+                                    "create_response": True,
+                                },
                             },
                             "output": {
                                 "format": {"type": "audio/pcmu"},
@@ -108,16 +117,31 @@ class OpenAIRealtimeVoiceModel(VoiceModel):
     async def _handle_event(self, event: dict) -> None:
         etype = event.get("type")
         if etype in ("response.output_audio.delta", "response.audio.delta"):
-            # GA sends mu-law bytes base64; relay straight to Twilio.
-            await self._send_audio(event["delta"])
+            self._assistant_speaking = True
+            await self._emit_framed(event["delta"])
+        elif etype in ("response.output_audio.done", "response.audio.done", "response.done"):
+            self._assistant_speaking = False
         elif etype == "input_audio_buffer.speech_started":
-            # Barge-in: caller started talking over the agent.
-            await self._clear_audio()
-            await self._ws.send(json.dumps({"type": "response.cancel"}))
+            # Barge-in: only act if the agent is actually talking. Server VAD
+            # already interrupts the model, so we just flush Twilio's buffer.
+            if self._assistant_speaking:
+                self._assistant_speaking = False
+                await self._clear_audio()
         elif etype == "response.function_call_arguments.done":
             await self._run_tool(event)
         elif etype == "error":
             logger.warning("OpenAI Realtime error: %s", event.get("error"))
+
+    async def _emit_framed(self, delta_b64: str) -> None:
+        """Split an audio delta into 20ms (160-byte) mu-law frames for Twilio."""
+        try:
+            raw = base64.b64decode(delta_b64)
+        except Exception:  # noqa: BLE001
+            await self._send_audio(delta_b64)
+            return
+        for i in range(0, len(raw), 160):
+            frame = raw[i:i + 160]
+            await self._send_audio(base64.b64encode(frame).decode())
 
     async def _run_tool(self, event: dict) -> None:
         name = event.get("name")

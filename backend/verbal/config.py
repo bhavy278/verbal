@@ -42,7 +42,7 @@ class Settings:
         self.openai_realtime_model: str = os.environ.get(
             "VERBAL_OPENAI_REALTIME_MODEL", "gpt-realtime"
         )
-        self.openai_realtime_voice: str = os.environ.get("VERBAL_OPENAI_REALTIME_VOICE", "alloy")
+        self.openai_realtime_voice: str = os.environ.get("VERBAL_OPENAI_REALTIME_VOICE", "marin")
 
         # Natural-language order-taker (text simulate + console + orchestrator brain).
         # "auto" -> LLM when OPENAI_API_KEY is present, else deterministic mock.
