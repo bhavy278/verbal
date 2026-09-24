@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import re
+
 from fastapi import APIRouter, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
 from ..config import get_settings
@@ -26,6 +28,52 @@ class SimStart(BaseModel):
 class SimTurn(BaseModel):
     call_sid: str
     text: str
+
+
+class VerifyCallerBody(BaseModel):
+    phone_number: str
+
+
+_E164 = re.compile(r"^\+[1-9]\d{6,14}$")
+
+
+@router.get("/verified-callers")
+async def verified_callers() -> dict:
+    """List Twilio verified caller IDs (numbers trial calls can connect to)."""
+    return {
+        "twilio_credentials": twilio_control.has_credentials(),
+        "verified": await twilio_control.list_verified_callers(),
+    }
+
+
+@router.post("/verify-caller")
+async def verify_caller(body: VerifyCallerBody) -> dict:
+    """Start caller-ID verification: Twilio calls the number with a code to key in."""
+    number = body.phone_number.strip()
+    if not _E164.match(number):
+        return JSONResponse(
+            status_code=400,
+            content={"error": "invalid_phone", "message": "Use E.164 format, e.g. +14155550123"},
+        )
+    if not twilio_control.has_credentials():
+        return JSONResponse(
+            status_code=400,
+            content={"error": "twilio_not_configured", "message": "Twilio credentials are not set"},
+        )
+    try:
+        result = await twilio_control.start_caller_verification(number)
+    except Exception as exc:  # noqa: BLE001
+        return JSONResponse(
+            status_code=502,
+            content={"error": "twilio_error", "message": str(exc)[:300]},
+        )
+    return {
+        **result,
+        "message": (
+            f"Twilio is calling {result['phone_number']}. When it asks, enter the "
+            f"code {result['validation_code']} on your phone keypad to verify."
+        ),
+    }
 
 
 @router.get("/readiness")
