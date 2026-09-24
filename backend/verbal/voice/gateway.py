@@ -118,8 +118,8 @@ async def twiml(request: Request) -> Response:
     """TwiML that opens a bidirectional Media Stream to our WS."""
     s = get_settings()
     host = _public_host(request)
-    # Validate the Twilio signature when credentials are configured.
-    if s.twilio_auth_token:
+    # Validate the Twilio signature only when explicitly enforced.
+    if s.twilio_auth_token and s.enforce_twilio_signature:
         url = f"https://{host}{request.url.path}"
         if request.method == "POST":
             form = await request.form()

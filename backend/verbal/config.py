@@ -62,6 +62,11 @@ class Settings:
         )
         # Exact public base URL Twilio calls (for signatures + wss stream URL).
         self.public_base_url: str | None = os.environ.get("PUBLIC_BASE_URL")
+        # Enforce X-Twilio-Signature (opt-in; off by default to keep first
+        # staging calls robust behind proxies).
+        self.enforce_twilio_signature: bool = (
+            os.environ.get("VERBAL_ENFORCE_TWILIO_SIGNATURE", "false") == "true"
+        )
         # Store both call audio + transcript (per product decision).
         self.store_call_audio: bool = os.environ.get("VERBAL_STORE_CALL_AUDIO", "true") == "true"
         self.store_call_transcript: bool = (
